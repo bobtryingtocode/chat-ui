@@ -7,6 +7,7 @@ import { loadMcpServersOnStartup } from "$lib/server/mcp/registry";
 import { AbortedGenerations } from "$lib/server/abortedGenerations";
 import { adminTokenManager } from "$lib/server/adminToken";
 import { MetricsServer } from "$lib/server/metrics";
+import { initFhir } from "$lib/server/fhir";
 
 export async function initServer(): Promise<void> {
 	// Wait for config to be fully loaded
@@ -37,6 +38,9 @@ export async function initServer(): Promise<void> {
 
 	// Load MCP servers at startup
 	loadMcpServersOnStartup();
+
+	// Initialize FHIR backend (if configured)
+	initFhir().catch((err) => logger.error(err, "Failed to initialize FHIR backend"));
 
 	// Init AbortedGenerations refresh process
 	AbortedGenerations.getInstance();

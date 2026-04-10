@@ -16,6 +16,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { logger } from "$lib/server/logger";
 import { building } from "$app/environment";
 import type { TokenCache } from "$lib/types/TokenCache";
+import type { FhirAuditLog, FhirOAuthToken, FhirConsent } from "$lib/types/FhirResource";
 import { onExit } from "./exitHandler";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -148,6 +149,11 @@ export class Database {
 			readPreference: secondaryPreferred,
 		});
 
+		// FHIR collections
+		const fhirAuditLogs = db.collection<FhirAuditLog>("fhir.auditLogs");
+		const fhirOAuthTokens = db.collection<FhirOAuthToken>("fhir.oauthTokens");
+		const fhirConsents = db.collection<FhirConsent>("fhir.consents");
+
 		return {
 			conversations,
 			conversationStats,
@@ -166,6 +172,9 @@ export class Database {
 			tokenCaches,
 			tools,
 			config: configCollection,
+			fhirAuditLogs,
+			fhirOAuthTokens,
+			fhirConsents,
 		};
 	}
 
@@ -189,6 +198,9 @@ export class Database {
 			semaphores,
 			tokenCaches,
 			config,
+			fhirAuditLogs,
+			fhirOAuthTokens,
+			fhirConsents,
 		} = this.getCollections();
 
 		conversations
@@ -379,6 +391,52 @@ export class Database {
 		config
 			.createIndex({ key: 1 }, { unique: true })
 			.catch((e) => logger.error(e, "Error creating index for config by key"));
+
+		// ── FHIR indexes ────────────────────────────────────────────────
+		fhirAuditLogs
+			.createIndex({ createdAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for fhirAuditLogs by createdAt"));
+		fhirAuditLogs
+			.createIndex({ userId: 1, createdAt: -1 })
+			.catch((e) =>
+				logger.error(e, "Error creating index for fhirAuditLogs by userId and createdAt")
+			);
+		fhirAuditLogs
+			.createIndex({ resourceType: 1, resourceId: 1, createdAt: -1 })
+			.catch((e) =>
+				logger.error(
+					e,
+					"Error creating index for fhirAuditLogs by resourceType, resourceId, createdAt"
+				)
+			);
+		fhirAuditLogs
+			.createIndex({ action: 1, createdAt: -1 })
+			.catch((e) =>
+				logger.error(e, "Error creating index for fhirAuditLogs by action and createdAt")
+			);
+
+		fhirOAuthTokens
+			.createIndex({ userId: 1, provider: 1 }, { unique: true })
+			.catch((e) =>
+				logger.error(e, "Error creating index for fhirOAuthTokens by userId and provider")
+			);
+		fhirOAuthTokens
+			.createIndex({ sessionId: 1 })
+			.catch((e) => logger.error(e, "Error creating index for fhirOAuthTokens by sessionId"));
+		fhirOAuthTokens
+			.createIndex({ expiresAt: 1 })
+			.catch((e) => logger.error(e, "Error creating index for fhirOAuthTokens by expiresAt"));
+
+		fhirConsents
+			.createIndex({ userId: 1, patientId: 1 }, { unique: true })
+			.catch((e) =>
+				logger.error(e, "Error creating index for fhirConsents by userId and patientId")
+			);
+		fhirConsents
+			.createIndex({ status: 1, expiresAt: 1 })
+			.catch((e) =>
+				logger.error(e, "Error creating index for fhirConsents by status and expiresAt")
+			);
 	}
 }
 
